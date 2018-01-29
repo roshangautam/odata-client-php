@@ -38,7 +38,7 @@ class Grammar implements IGrammar
         'queryString',
         'properties',
         'wheres',
-        //'expand',
+        'expand',
         //'search',
         'orders',
         'skip',
@@ -63,13 +63,15 @@ class Grammar implements IGrammar
         // To compile the query, we'll spin through each component of the query and
         // see if that component exists. If it does we'll just call the compiler
         // function for the component which is responsible for making the SQL.
-        $uri = trim($this->concatenate(
-            $this->compileComponents($query))
+        $uri = trim(
+            $this->concatenate(
+            $this->compileComponents($query)
+        )
         );
 
         $query->properties = $original;
 
-        //dd($uri);
+//        dd($uri);
         
         return $uri;
     }
@@ -132,7 +134,7 @@ class Grammar implements IGrammar
 
     protected function compileQueryString(Builder $query, $queryString)
     {
-        if (isset($query->entitySet) 
+        if (isset($query->entitySet)
             && (
                 !empty($query->properties)
                 || isset($query->wheres)
@@ -190,6 +192,43 @@ class Grammar implements IGrammar
         }
         
         return $select;
+    }
+
+    /**
+     * Compile the "$select=" portion of the OData query.
+     *
+     * @param Builder $query
+     * @param array   $properties
+     *
+     * @return string|null
+     */
+    protected function compileExpand(Builder $query, $expands)
+    {
+        // If the query is actually performing an aggregating select, we will let that
+        // compiler handle the building of the select clauses, as it will need some
+        // more syntax that is best handled by that function to keep things neat.
+        if (! is_null($query->count)) {
+            return;
+        }
+
+        $expand = '';
+
+        if (count($expands) > 0) {
+            if ($query->select) {
+                $expand .= '&';
+            }
+            $expand = '$expand=' . collect($expands)->implode('property', ',');
+        }
+
+        ////        function($expand) {
+        ////           dd($expand->getGrammar()->compileSelect($expand));
+        ////        });
+//        $expand = '';
+//        if (! empty($expands)) {
+//            $expand = '$expand='.$this->columnize($expands);
+//        }
+
+        return $expand;
     }
 
     /**
@@ -312,7 +351,7 @@ class Grammar implements IGrammar
         if (! empty($query->entityKey)) {
             return '';
         }
-        return '$top='.(int) $take;
+        return ($query->select || $query->expand ? '&' : '') . '$top='.(int) $take;
     }
 
     /**

@@ -40,6 +40,7 @@ class Builder
         'select' => [],
         'where'  => [],
         'order'  => [],
+        'expand' => []
     ];
 
     /**
@@ -139,6 +140,8 @@ class Builder
      * @var array
      */
     public $select = [];
+
+    public $expand = [];
 
     /**
      * @var IProcessor
@@ -243,10 +246,10 @@ class Builder
      *
      * @return $this
      */
-    public function expand($property, $first, $operator = null, $second = null, $type = 'inner', $ref = false, $count = false)
+    public function expand($property, $first, $operator = null, $second = null, $type = 'inner', $ref = false, $count = false, $where = false)
     {
         //TODO: need to flush out this method as it will work much like the where and join methods
-        $expand = new ExpandClause($this, $type, $property);
+        $expand = new ExpandClause($this, $property);
 
         // If the first "column" of the join is really a Closure instance the developer
         // is trying to build a join with a complex "on" clause containing more than
@@ -254,7 +257,7 @@ class Builder
         if ($first instanceof Closure) {
             call_user_func($first, $expand);
 
-            $this->expands[] = $expand;
+            $this->expand[] = $expand;
 
             $this->addBinding($expand->getBindings(), 'expand');
         }
@@ -265,7 +268,7 @@ class Builder
         else {
             $method = $where ? 'where' : 'on';
 
-            $this->expands[] = $expand->$method($first, $operator, $second);
+            $this->expand[] = $expand->$method($first, $operator, $second);
 
             $this->addBinding($expand->getBindings(), 'expand');
         }
@@ -384,6 +387,43 @@ class Builder
         if (! $value instanceof Expression) {
             $this->addBinding($value, 'where');
         }
+
+        return $this;
+    }
+
+    /**
+     * Add a "where" clause comparing two columns to the query.
+     *
+     * @param  string|array  $first
+     * @param  string|null  $operator
+     * @param  string|null  $second
+     * @param  string|null  $boolean
+     * @return \Illuminate\Database\Query\Builder|static
+     */
+    public function whereColumn($first, $operator = null, $second = null, $boolean = 'and')
+    {
+        // If the column is an array, we will assume it is an array of key-value pairs
+        // and can add them each as a where clause. We will maintain the boolean we
+        // received when the method was called and pass it into the nested where.
+        if (is_array($first)) {
+            return $this->addArrayOfWheres($first, $boolean, 'whereColumn');
+        }
+
+        // If the given operator is not found in the list of valid operators we will
+        // assume that the developer is just short-cutting the '=' operators and
+        // we will set the operators to '=' and set the values appropriately.
+        if ($this->invalidOperator($operator)) {
+            list($second, $operator) = [$operator, '='];
+        }
+
+        // Finally, we will add this where clause into this array of clauses that we
+        // are building for the query. All of them will be compiled via a grammar
+        // once the query is about to be executed and run against the database.
+        $type = 'Column';
+
+        $this->wheres[] = compact(
+            'type', 'first', 'operator', 'second', 'boolean'
+        );
 
         return $this;
     }
@@ -815,5 +855,25 @@ class Builder
     public function getClient()
     {
         return $this->client;
+    }
+
+    /**
+     * Get the database query processor instance.
+     *
+     * @return \Illuminate\Database\Query\Processors\Processor
+     */
+    public function getProcessor()
+    {
+        return $this->processor;
+    }
+
+    /**
+     * Get the query grammar instance.
+     *
+     * @return \Illuminate\Database\Query\Grammars\Grammar
+     */
+    public function getGrammar()
+    {
+        return $this->grammar;
     }
 }

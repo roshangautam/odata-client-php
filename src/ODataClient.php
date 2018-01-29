@@ -225,7 +225,7 @@ class ODataClient implements IODataClient
     public function request($method, $requestUri)
     {
         $request = new ODataRequest($method, $this->baseUrl.$requestUri, $this, $this->entityReturnType);
-
+        
         return $request->execute();
     }
 

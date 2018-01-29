@@ -32,7 +32,7 @@ class ExpandClause extends Builder
         $this->parentQuery = $parentQuery;
 
         parent::__construct(
-            $parentQuery->getConnection(), $parentQuery->getGrammar(), $parentQuery->getProcessor()
+            $parentQuery->getClient(), $parentQuery->getGrammar(), $parentQuery->getProcessor()
         );
     }
 
